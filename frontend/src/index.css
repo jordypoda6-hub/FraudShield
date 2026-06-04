@@ -1,0 +1,144 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg:         #080C18;
+  --s1:         #0E1525;
+  --s2:         #131D30;
+  --s3:         #1A2640;
+  --b1:         #1E2D45;
+  --b2:         #253550;
+  --b3:         #2E4060;
+
+  --t1:         #E8EEF8;
+  --t2:         #99A8C4;
+  --t3:         #576480;
+  --t4:         #2E3D58;
+
+  --green:      #3EDBA0;
+  --green-dim:  rgba(62,219,160,0.12);
+  --green-b:    rgba(62,219,160,0.25);
+  --amber:      #F5B849;
+  --amber-dim:  rgba(245,184,73,0.10);
+  --amber-b:    rgba(245,184,73,0.25);
+  --red:        #F96060;
+  --red-dim:    rgba(249,96,96,0.10);
+  --red-b:      rgba(249,96,96,0.25);
+  --blue:       #5B8EF0;
+  --blue-dim:   rgba(91,142,240,0.12);
+
+  --font: 'Inter', sans-serif;
+  --mono: 'JetBrains Mono', monospace;
+  --r:    6px;
+  --r2:   10px;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--t1);
+  font-family: var(--font);
+  font-size: 13px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--b2); border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover { background: var(--b3); }
+
+/* Animations */
+@keyframes slideInDown {
+  from { opacity: 0; transform: translateY(-10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes modalIn {
+  from { opacity: 0; transform: translateX(24px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+@keyframes pulse {
+  0%,100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: 0.5; transform: scale(0.85); }
+}
+@keyframes ripple {
+  0%   { transform: scale(1); opacity: 0.6; }
+  100% { transform: scale(2.5); opacity: 0; }
+}
+@keyframes scan {
+  from { transform: translateY(-100%); opacity: 0; }
+  50%  { opacity: 0.06; }
+  to   { transform: translateY(100%); opacity: 0; }
+}
+
+.anim-row    { animation: slideInDown 0.22s ease forwards; }
+.anim-modal  { animation: modalIn    0.28s cubic-bezier(0.16,1,0.3,1) forwards; }
+.anim-fade   { animation: fadeUp     0.3s  ease forwards; }
+
+/* Live dot */
+.dot-live {
+  position: relative; width: 8px; height: 8px;
+  border-radius: 50%; background: var(--green);
+}
+.dot-live::after {
+  content: ''; position: absolute; inset: 0;
+  border-radius: 50%; background: var(--green);
+  animation: ripple 2s ease-out infinite;
+}
+
+/* Verdict chips */
+.chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 8px; border-radius: 99px;
+  font-size: 11px; font-weight: 500; letter-spacing: 0.02em;
+}
+.chip-n { background: var(--green-dim); color: var(--green);  border: 1px solid var(--green-b); }
+.chip-s { background: var(--amber-dim); color: var(--amber);  border: 1px solid var(--amber-b); }
+.chip-f { background: var(--red-dim);   color: var(--red);    border: 1px solid var(--red-b); }
+
+/* Cards */
+.card {
+  background: var(--s1);
+  border: 1px solid var(--b1);
+  border-radius: var(--r2);
+}
+
+/* Nav items */
+.nav-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 12px; border-radius: var(--r);
+  cursor: pointer; font-size: 13px; font-weight: 400;
+  color: var(--t2); transition: all 0.15s ease;
+  border: 1px solid transparent;
+}
+.nav-item:hover  { background: var(--s2); color: var(--t1); }
+.nav-item.active { background: var(--s2); color: var(--t1); border-color: var(--b2); }
+
+/* Table */
+.tbl { width: 100%; border-collapse: collapse; }
+.tbl th {
+  padding: 10px 14px; text-align: left;
+  font-size: 10px; font-weight: 500; color: var(--t3);
+  text-transform: uppercase; letter-spacing: 0.07em;
+  border-bottom: 1px solid var(--b1);
+  background: var(--bg); position: sticky; top: 0;
+}
+.tbl td {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--b1);
+  color: var(--t1); font-size: 12px;
+  white-space: nowrap;
+}
+.tbl tr:hover td { background: var(--s2); cursor: pointer; }
+.tbl tr.fraud-row td { background: rgba(249,96,96,0.03); }
+
+@keyframes pulse-dot {
+  0%,100% { opacity: 1; }
+  50%      { opacity: 0.3; }
+}
