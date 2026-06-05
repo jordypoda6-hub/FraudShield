@@ -5,12 +5,14 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
 // Test si le backend Flask est disponible
 export async function checkHealth() {
   try {
-    const res = await fetch(`${API_URL}/health`, { signal: AbortSignal.timeout(2000) })
+    // Augmentation du timeout à 7000ms (7 secondes) pour absorber la latence de Render
+    const res = await fetch(`${API_URL}/health`, { signal: AbortSignal.timeout(7000) })
     return res.ok
   } catch {
     return false
   }
 }
+
 
 // Prédiction via Flask — fallback sur scoring local si Flask indisponible
 export async function predictTransaction(tx) {
