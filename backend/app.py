@@ -10,10 +10,13 @@ app = Flask(__name__)
 
 # ── CORS configuré selon l'environnement ──────────────────────
 allow_origins = [
-    'http://localhost:5173',     # Vite dev
-    'http://localhost:3000',     # fallback
-    'http://localhost:5000',     # backend dev
+    'http://localhost:5173',
+    'http://localhost:3000',
+    'http://localhost:5000',
+    'https://fraud-shield-flame.vercel.app',  # domaine Vercel
 ]
+
+CORS(app, origins=allow_origins, supports_credentials=True)
 
 # En prod, ajouter les domaines Vercel
 if os.getenv('FLASK_ENV') == 'production':
