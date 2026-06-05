@@ -5,35 +5,42 @@ import json
 import numpy as np
 import math
 import os
+import re
 
 app = Flask(__name__)
 
-# ── CORS configuré selon l'environnement ──────────────────────
-allowed_origins = [
-    "https://fraud-shield-2kmcpn188-jordypoda6-hubs-projects.vercel.app",
-    "https://fraud-shield-two.vercel.app",  # Ajoutez votre domaine de production principal si vous en avez un
-    "http://localhost:5173",                 # Pour vos tests en local
-    "http://localhost:3000"
-]
+# ── CORS configuré — accepte tous les déploiements Vercel du projet ──
+def make_cors_origins():
+    origins = [
+        "http://localhost:5173",
+        "http://localhost:3000",
+    ]
+    # URL de prod fixe (si tu en as une)
+    fixed = os.getenv("ALLOWED_ORIGINS", "")
+    if fixed:
+        origins += [o.strip() for o in fixed.split(",") if o.strip()]
+    return origins
 
+# regex pour accepter toutes les previews Vercel du projet
 CORS(app, resources={r"/*": {
-    "origins": allowed_origins,
+    "origins": make_cors_origins(),
+    "allow_headers": ["Content-Type", "Authorization"],
     "methods": ["GET", "POST", "OPTIONS"],
-    "allow_headers": ["Content-Type", "Authorization"]
+    "supports_credentials": False,
 }})
 
-# En prod, ajouter les domaines Vercel
-if os.getenv('FLASK_ENV') == 'production':
-    vercel_domain = os.getenv('VERCEL_URL')  # ex: fraud-v5.vercel.app
-    if vercel_domain:
-        allow_origins.extend([
-            f'https://{vercel_domain}',
-            'https://fraud-v5.vercel.app',  # À adapter avec ton domaine
-        ])
+# Hack: accepter dynamiquement *.vercel.app pour les previews
+@app.after_request
+def allow_vercel_previews(response):
+    origin = request.headers.get("Origin", "")
+    if re.match(r"https://[\w-]+-jordypoda6-hubs-projects\.vercel\.app$", origin) \
+       or re.match(r"https://fraud-shield[\w-]*\.vercel\.app$", origin):
+        response.headers["Access-Control-Allow-Origin"] = origin
+        response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
+        response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
+    return response
 
-CORS(app, origins=allow_origins, supports_credentials=True)
-
-# ── Chargement des fichiers ──────────────────────────────────────
+# ── Chargement des fichiers ──────────────────────────────────────────
 BASE = os.path.dirname(os.path.abspath(__file__))
 
 scaler = joblib.load(os.path.join(BASE, 'scaler_robust.pkl'))
@@ -45,43 +52,32 @@ with open(os.path.join(BASE, 'feature_names.json')) as f:
 print(f"✅ Modèle chargé — {len(FEATURES)} features")
 print(f"   Features : {FEATURES}")
 
-# ── Seuils de décision ───────────────────────────────────────────
-SEUIL_FRAUD   = 0.059   # seuil optimal coût métier (notebook 3)
-SEUIL_SUSPECT = 0.020   # zone grise
+# ── Seuils de décision ───────────────────────────────────────────────
+SEUIL_FRAUD   = 0.059
+SEUIL_SUSPECT = 0.020
 
-# ── Ingénierie des features ──────────────────────────────────────
+# ── Ingénierie des features ──────────────────────────────────────────
 def engineer(tx: dict) -> dict:
-    """
-    Reçoit : V1-V28, amount (float), hour (int 0-23)
-    Retourne : les 33 features dans l'ordre exact de feature_names.json
-    """
     feats = {}
-
-    # V1 à V28 — passés directement
     for i in range(1, 29):
         feats[f'V{i}'] = float(tx.get(f'V{i}', 0.0))
 
-    # amount_log = log(amount + 1)
     amount = float(tx.get('amount', 0.0))
     feats['amount_log'] = math.log(amount + 1)
 
-    # Encodage cyclique de l'heure
     hour = int(tx.get('hour', 0))
     feats['heure_sin'] = math.sin(2 * math.pi * hour / 24)
     feats['heure_cos'] = math.cos(2 * math.pi * hour / 24)
 
-    # Tranche horaire : 0=nuit(0-5) 1=matin(6-11) 2=après-midi(12-17) 3=soir(18-23)
     if   hour < 6:   feats['tranche'] = 0
     elif hour < 12:  feats['tranche'] = 1
     elif hour < 18:  feats['tranche'] = 2
     else:            feats['tranche'] = 3
 
-    # Flag montant nul
     feats['is_zero_amount'] = 1 if amount == 0 else 0
-
     return feats
 
-# ── Routes ───────────────────────────────────────────────────────
+# ── Routes ───────────────────────────────────────────────────────────
 @app.route('/health', methods=['GET'])
 def health():
     return jsonify({
@@ -95,19 +91,12 @@ def health():
 def predict():
     try:
         tx = request.get_json(force=True)
-
-        # Construire le vecteur dans l'ordre exact
-        feats  = engineer(tx)
-        X_raw  = np.array([[feats[f] for f in FEATURES]], dtype=np.float64)
-
-        # Scaling
+        feats    = engineer(tx)
+        X_raw    = np.array([[feats[f] for f in FEATURES]], dtype=np.float64)
         X_scaled = scaler.transform(X_raw)
+        proba    = float(model.predict_proba(X_scaled)[0][1])
+        score    = round(proba * 100)
 
-        # Prédiction
-        proba  = float(model.predict_proba(X_scaled)[0][1])
-        score  = round(proba * 100)
-
-        # Verdict
         if proba >= SEUIL_FRAUD:
             verdict = 'fraud'
         elif proba >= SEUIL_SUSPECT:
@@ -121,13 +110,11 @@ def predict():
             'verdict': verdict,
             'seuil':   SEUIL_FRAUD,
         })
-
     except Exception as e:
-        return jsonify({ 'error': str(e) }), 500
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/predict_batch', methods=['POST'])
 def predict_batch():
-    """Prédit plusieurs transactions en une seule requête."""
     try:
         transactions = request.get_json(force=True)
         results = []
@@ -137,21 +124,12 @@ def predict_batch():
             X_scaled = scaler.transform(X_raw)
             proba    = float(model.predict_proba(X_scaled)[0][1])
             score    = round(proba * 100)
-            verdict  = 'fraud' if proba>=SEUIL_FRAUD else ('suspect' if proba>=SEUIL_SUSPECT else 'normal')
-            results.append({ 'id': tx.get('id'), 'score': score, 'proba': round(proba,6), 'verdict': verdict })
+            verdict  = 'fraud' if proba >= SEUIL_FRAUD else ('suspect' if proba >= SEUIL_SUSPECT else 'normal')
+            results.append({'id': tx.get('id'), 'score': score, 'proba': round(proba, 6), 'verdict': verdict})
         return jsonify(results)
     except Exception as e:
-        return jsonify({ 'error': str(e) }), 500
+        return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
     port = int(os.getenv('PORT', 5000))
-    flask_env = os.getenv('FLASK_ENV', 'development')
-    debug = flask_env == 'development'
-    
-    print(f"\n🚀 FraudShield Backend")
-    print(f"   Environnement: {flask_env}")
-    print(f"   Port: {port}")
-    print(f"   /health   → statut du serveur")
-    print(f"   /predict  → prédiction transaction unique\n")
-    
-    app.run(host='0.0.0.0', port=port, debug=debug)
+    app.run(host='0.0.0.0', port=port, debug=False)
