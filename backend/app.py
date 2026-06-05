@@ -9,14 +9,18 @@ import os
 app = Flask(__name__)
 
 # ── CORS configuré selon l'environnement ──────────────────────
-allow_origins = [
-    'http://localhost:5173',
-    'http://localhost:3000',
-    'http://localhost:5000',
-    'https://fraud-shield-flame.vercel.app',  # domaine Vercel
+allowed_origins = [
+    "https://fraud-shield-2kmcpn188-jordypoda6-hubs-projects.vercel.app",
+    "https://fraud-shield-two.vercel.app",  # Ajoutez votre domaine de production principal si vous en avez un
+    "http://localhost:5173",                 # Pour vos tests en local
+    "http://localhost:3000"
 ]
 
-CORS(app, origins=allow_origins, supports_credentials=True)
+CORS(app, resources={r"/*": {
+    "origins": allowed_origins,
+    "methods": ["GET", "POST", "OPTIONS"],
+    "allow_headers": ["Content-Type", "Authorization"]
+}})
 
 # En prod, ajouter les domaines Vercel
 if os.getenv('FLASK_ENV') == 'production':
